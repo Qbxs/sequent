@@ -4,7 +4,7 @@ module SequentCalculus where
 
 import Prop
 
-import Data.List
+import Data.List (intercalate, intersect)
 import Text.PrettyPrint hiding (render, (<>))
 import qualified Text.PrettyPrint as P (render)
 
@@ -14,8 +14,8 @@ data Sequent = (:=>) [Expr] [Expr]
 
 instance Render Sequent where
   render (g :=> d) = gamma <> " ⊢ " <> delta
-                  where gamma = render `concatMap` g
-                        delta = render `concatMap` d
+                  where gamma = intercalate "," $ render <$> g
+                        delta = intercalate "," $ render <$> d
 
 data Proof
   = ConjL Sequent Proof
@@ -30,19 +30,21 @@ data Proof
  deriving (Show, Eq)
 
 -- helpers
-($/$) x y = x $+$ text "—————" $+$ y
+rule :: String -> Doc -> Doc -> Doc
+rule str x y = x $$ (text "——————————" <+> text str) $$ y
+renderS :: Sequent -> Doc
 renderS = text . render
 
 prettyProof :: Proof -> Doc
-prettyProof (ConjL s pr) = prettyProof pr $/$ renderS s
-prettyProof (ConjR s pr1 pr2) = (prettyProof pr1 <+> prettyProof pr2) $/$ renderS s
-prettyProof (DisjL s pr1 pr2) = (prettyProof pr1 <+> prettyProof pr2) $/$ renderS s
-prettyProof (DisjR s pr) = prettyProof pr $/$ renderS s
-prettyProof (ImplL s pr1 pr2) = (prettyProof pr1 <+> prettyProof pr2) $/$ renderS s
-prettyProof (ImplR s pr) = prettyProof pr $/$ renderS s
-prettyProof (NegL s pr) = prettyProof pr $/$ renderS s
-prettyProof (NegR s pr) = prettyProof pr $/$ renderS s
-prettyProof (Axiom s) = text "AXIOM" $/$ renderS s
+prettyProof (ConjL s pr) = rule "∧l" (prettyProof pr) (renderS s)
+prettyProof (ConjR s pr1 pr2) = rule "∧r" (prettyProof pr1 <+> prettyProof pr2) (renderS s)
+prettyProof (DisjL s pr1 pr2) = rule "∨l" (prettyProof pr1 <+> prettyProof pr2) (renderS s)
+prettyProof (DisjR s pr) = rule "∨r" (prettyProof pr) (renderS s)
+prettyProof (ImplL s pr1 pr2) = rule "→l" (prettyProof pr1 <+> prettyProof pr2) (renderS s)
+prettyProof (ImplR s pr) = rule "→r" (prettyProof pr) (renderS s)
+prettyProof (NegL s pr) = rule "¬l" (prettyProof pr) (renderS s)
+prettyProof (NegR s pr) = rule "¬r" (prettyProof pr) (renderS s)
+prettyProof (Axiom s) = rule "" (text "axiom") (renderS s)
 
 instance Render Proof where
   render = renderStyle s . prettyProof
