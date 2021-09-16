@@ -5,8 +5,11 @@ module SequentCalculus where
 import Prop
 
 import Data.List (intercalate, intersect)
-import Text.PrettyPrint hiding (render, (<>))
-import qualified Text.PrettyPrint as P (render)
+import Text.PrettyPrint.Boxes hiding (render, (<>))
+import qualified Text.PrettyPrint.Boxes as Pretty
+
+-- mysterious
+-- block = renderStyle (Style PageMode 100 1.0) $ (int 1 $$ int 2) <+> (nest (-1) $ int 3 $$ int 4)
 
 
 data Sequent = (:=>) [Expr] [Expr]
@@ -30,25 +33,24 @@ data Proof
  deriving (Show, Eq)
 
 -- helpers
-rule :: String -> Doc -> Doc -> Doc
-rule str x y = x $$ (text "——————————" <+> text str) $$ y
-renderS :: Sequent -> Doc
+rule :: String -> Box -> Box -> Box
+rule str x y = vcat center2 [x, text (replicate (cols x) '—') <+> text str, y]
+renderS :: Sequent -> Box
 renderS = text . render
 
-pretty :: Proof -> Doc
+pretty :: Proof -> Box
 pretty (ConjL s pr) = rule "∧l" (pretty pr) (renderS s)
-pretty (ConjR s pr1 pr2) = rule "∧r" (pretty pr1 <+> pretty pr2) (renderS s)
-pretty (DisjL s pr1 pr2) = rule "∨l" (pretty pr1 <+> pretty pr2) (renderS s)
+pretty (ConjR s pr1 pr2) = rule "∧r" (hcat bottom [pretty pr1, pretty pr2]) (renderS s)
+pretty (DisjL s pr1 pr2) = rule "∨l" (hcat bottom [pretty pr1, pretty pr2]) (renderS s)
 pretty (DisjR s pr) = rule "∨r" (pretty pr) (renderS s)
-pretty (ImplL s pr1 pr2) = rule "→l" (pretty pr1 <+> pretty pr2) (renderS s)
+pretty (ImplL s pr1 pr2) = rule "→l" (hcat bottom [pretty pr1, pretty pr2]) (renderS s)
 pretty (ImplR s pr) = rule "→r" (pretty pr) (renderS s)
 pretty (NegL s pr) = rule "¬l" (pretty pr) (renderS s)
 pretty (NegR s pr) = rule "¬r" (pretty pr) (renderS s)
 pretty (Axiom s) = rule "" (text "axiom") (renderS s)
 
 instance Render Proof where
-  render = renderStyle s . pretty
-    where s = Style PageMode 100 1.0
+  render = Pretty.render . pretty
 
 tauto :: Expr -> Bool
 tauto p = valid ([] :=> pure p)
@@ -108,7 +110,7 @@ proof (((Conj p q):g) :=> d) = do
   pr <- proof ((p:(q:g)) :=> d)
   return $ ConjL ((Conj p q:g) :=> d) pr
 proof (g :=> []) = Nothing
-proof ([] :=> d) = Nothing
+proof ([] :=> (q:d)) = if all isAtom d then Nothing else proof ([] :=> (d<>[q]))
 proof ((p:g) :=> (q:d)) | all isAtom g && all isAtom d
                             = if null $ intersect (p:g) (q:d)
                               then Nothing
