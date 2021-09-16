@@ -8,9 +8,6 @@ import Data.List (intercalate, intersect)
 import Text.PrettyPrint.Boxes hiding (render, (<>))
 import qualified Text.PrettyPrint.Boxes as Pretty
 
--- mysterious
--- block = renderStyle (Style PageMode 100 1.0) $ (int 1 $$ int 2) <+> (nest (-1) $ int 3 $$ int 4)
-
 
 data Sequent = (:=>) [Expr] [Expr]
  deriving (Show, Eq)
@@ -74,7 +71,7 @@ valid (g :=> ((Conj p q):d)) = valid (g :=> (p:d)) && valid (g :=> (q:d))
 valid (((Conj p q):g) :=> d) = valid ((p:(q:g)) :=> d)
 -- axiom/confluence
 valid (g :=> []) = False
-valid ([] :=> d) = False
+valid ([] :=> (q:d)) = all isAtom d || valid (d<>[q])
 valid ((p:g) :=> (q:d)) | all isAtom g && all isAtom d
                              = not $ null $ intersect (p:g) (q:d)
                         | all isAtom g = valid ((p:g) :=> (d<>[q]))
