@@ -82,44 +82,44 @@ proof :: Sequent -> Maybe Proof
 -- negation right
 proof (g :=> ((Neg p):d)) = do
   pr <- proof ((p:g) :=> d)
-  return $ NegR (g :=> ((Neg p):d)) pr
+  return $ NegR (g :=> (Neg p:d)) pr
 -- negation left
 proof (((Neg p):g) :=> d) = do
   pr <- proof (g :=> (p:d))
-  return $ NegL (((Neg p):g) :=> d) pr
+  return $ NegL ((Neg p:g) :=> d) pr
 -- implication right
 proof (g :=> ((Impl p q):d)) = do
   pr <- proof ((p:g) :=> (q:d))
-  return $ ImplR (g :=> ((Impl p q):d)) pr
+  return $ ImplR (g :=> (Impl p q:d)) pr
 -- implication left
 proof (((Impl p q):g) :=> d) = do
   pr1 <- proof (g :=> (p:d))
   pr2 <- proof ((q:g) :=> d)
-  return $ ImplL (((Impl p q):g) :=> d) pr1 pr2
+  return $ ImplL ((Impl p q:g) :=> d) pr1 pr2
 -- disjunction right
 proof (g :=> ((Disj p q):d)) = do
   pr <- proof (g :=> (p:(q:d)))
-  return $ DisjR (g :=> ((Disj p q):d)) pr
+  return $ DisjR (g :=> (Disj p q:d)) pr
 -- disjunction left
 proof (((Disj p q):g) :=> d) = do
   pr1 <- proof ((p:g) :=> d)
   pr2 <- proof ((q:g) :=> d)
-  return $ DisjL (((Disj p q):g) :=> d) pr1 pr2
+  return $ DisjL ((Disj p q:g) :=> d) pr1 pr2
 -- conjunction right
-proof (g :=> ((Conj p q):d)) = do
+proof (g :=> (Conj p q:d)) = do
   pr1 <- proof (g :=> (p:d))
   pr2 <- proof (g :=> (q:d))
-  return $ ConjR (g :=> ((Conj p q):d)) pr1 pr2
+  return $ ConjR (g :=> (Conj p q:d)) pr1 pr2
 -- conjunction left
 proof (((Conj p q):g) :=> d) = do
   pr <- proof ((p:(q:g)) :=> d)
-  return $ ConjL (((Conj p q):g) :=> d) pr
+  return $ ConjL ((Conj p q:g) :=> d) pr
 -- axiom/confluence
 proof (g :=> []) = Nothing
 proof ([] :=> ((Atom p):d)) = if all isAtom d
-                              then return $ Axiom ([] :=> ((Atom p):d))
+                              then return $ Axiom ([] :=> (Atom p:d))
                               else proof ([] :=> (d<>[Atom p]))
-proof ((p:g) :=> (q:d)) | all isAtom g && all isAtom d && (not $ null $ intersect (p:g) (q:d))
+proof ((p:g) :=> (q:d)) | all isAtom g && all isAtom d && not (null $ intersect (p:g) (q:d))
                             = return $ Axiom ((p:g) :=> (q:d))
                         | all isAtom g = proof ((p:g) :=> (d<>[q]))
                         | otherwise = proof ((g<>[p]) :=> (q:d))
