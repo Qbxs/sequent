@@ -108,13 +108,12 @@ proof e@((Bucket s ((Neg p):g)) :=> d) = do
 proof e@(g :=> (Bucket s ((Impl p q):d))) = do
   pr <- proof (push p g :=> push q (Bucket s d))
   return $ ImplR e pr
-proof e@((Bucket s ((Impl p q):g)) :=> d) = do
-  pr1 <- proof (Bucket s g :=> push p d)
-  pr2 <- proof (push q (Bucket s g) :=> d)
-  return $ ImplL e pr1 pr2
 proof e@(g :=> (Bucket s ((Disj p q):d))) = do
   pr <- proof (g :=> push p (push q (Bucket s d)))
   return $ DisjR e pr
+proof e@((Bucket s ((Conj p q):g)) :=> d) = do
+  pr <- proof (push p (push q (Bucket s g)) :=> d)
+  return $ ConjL e pr
 proof e@((Bucket s ((Disj p q):g)) :=> d) = do
   pr1 <- proof (push p (Bucket s g) :=> d)
   pr2 <- proof (push q (Bucket s g) :=> d)
@@ -123,9 +122,10 @@ proof e@(g :=> (Bucket s (Conj p q:d))) = do
   pr1 <- proof (g :=> push p (Bucket s d))
   pr2 <- proof (g :=> push q (Bucket s d))
   return $ ConjR e pr1 pr2
-proof e@((Bucket s ((Conj p q):g)) :=> d) = do
-  pr <- proof (push p (push q (Bucket s g)) :=> d)
-  return $ ConjL e pr
+proof e@((Bucket s ((Impl p q):g)) :=> d) = do
+  pr1 <- proof (Bucket s g :=> push p d)
+  pr2 <- proof (push q (Bucket s g) :=> d)
+  return $ ImplL e pr1 pr2
 proof e@((Bucket s []) :=> (Bucket t [])) = if S.null $ S.intersection s t
                                             then tell False >> return (Assumption e)
                                             else return $ Axiom e
