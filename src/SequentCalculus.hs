@@ -5,17 +5,25 @@ module SequentCalculus where
 import Prop
 
 import Data.List (intercalate, intersect)
+import qualified Data.Set as S
 import Text.PrettyPrint.Boxes hiding (render, (<>))
 import qualified Text.PrettyPrint.Boxes as Pretty
 
-
-data Sequent = (:=>) [Expr] [Expr]
+-- used to separate atomic and non atomic Expressions
+data Bucket a = Bucket (S.Set a) [a]
  deriving (Show, Eq)
 
+data Sequent = (:=>) (Bucket Expr) (Bucket Expr)
+ deriving (Show, Eq)
+
+push :: Expr -> Bucket Expr -> Bucket Expr
+push a@(Atom p) (Bucket s l) = Bucket (S.insert a s) l
+push p (Bucket s l) = Bucket s (p:l)
+
 instance Render Sequent where
-  render (g :=> d) = gamma <> " ⊢ " <> delta
-                  where gamma = intercalate "," $ render <$> g
-                        delta = intercalate "," $ render <$> d
+  render ((Bucket s g) :=> (Bucket t d)) = gamma <> " ⊢ " <> delta
+                  where gamma = intercalate "," $ render <$> (g <> S.toList s)
+                        delta = intercalate "," $ render <$> (d <> S.toList t)
 
 data Proof
   = ConjL Sequent Proof
@@ -49,72 +57,71 @@ pretty (Axiom s) = rule "" (text "axiom") (renderS s)
 instance Render Proof where
   render = Pretty.render . pretty
 
-tauto :: Expr -> Bool
-tauto p = valid ([] :=> pure p)
+tauto :: Expr -> Maybe Proof
+tauto p = proof (Bucket S.empty [] :=> Bucket S.empty [p])
 
 valid :: Sequent -> Bool
+-- remove atoms
+valid ((Bucket s ((Atom p):g)) :=> d) = valid (Bucket (S.insert (Atom p) s) g :=> d)
+valid (g :=> (Bucket s ((Atom p):d))) = valid (g :=> Bucket (S.insert (Atom p) s) d)
 -- negation right
-valid (g :=> ((Neg p):d)) = valid ((p:g) :=> d)
+valid (g :=> (Bucket s ((Neg p):d))) = valid (push p g :=> Bucket s d)
 -- negation left
-valid (((Neg p):g) :=> d) = valid (g :=> (p:d))
+valid ((Bucket s ((Neg p):g)) :=> d) = valid (Bucket s g :=> push p d)
 -- implication right
-valid (g :=> ((Impl p q):d)) = valid ((p:g) :=> (q:d))
+valid (g :=> (Bucket s ((Impl p q):d))) = valid (push p g :=> push q (Bucket s d))
 -- implication left
-valid (((Impl p q):g) :=> d) = valid (g :=> (p:d)) && valid ((q:g) :=> d)
+valid ((Bucket s ((Impl p q):g)) :=> d) = valid (Bucket s g :=> push p d)
+                                       && valid (push q (Bucket s g) :=> d)
 -- disjunction right
-valid (g :=> ((Disj p q):d)) = valid (g :=> (p:(q:d)))
+valid (g :=> (Bucket s ((Disj p q):d))) = valid (g :=> push p (push q (Bucket s d)))
 -- disjunction left
-valid (((Disj p q):g) :=> d) = valid ((p:g) :=> d) && valid ((q:g) :=> d)
+valid ((Bucket s ((Disj p q):g)) :=> d) = valid (push p (Bucket s g) :=> d)
+                                       && valid (push q (Bucket s g) :=> d)
 -- conjunction right
-valid (g :=> ((Conj p q):d)) = valid (g :=> (p:d)) && valid (g :=> (q:d))
+valid (g :=> (Bucket s ((Conj p q):d))) = valid (g :=> push p (Bucket s d))
+                                       && valid (g :=> push q (Bucket s d))
 -- conjunction left
-valid (((Conj p q):g) :=> d) = valid ((p:(q:g)) :=> d)
--- axiom/confluence
-valid (g :=> []) = False
-valid ([] :=> (q:d)) = all isAtom d || valid (d<>[q])
-valid ((p:g) :=> (q:d)) | all isAtom g && all isAtom d
-                             = not $ null $ intersect (p:g) (q:d)
-                        | all isAtom g = valid ((p:g) :=> (d<>[q]))
-                        | otherwise = valid ((g<>[p]) :=> (q:d))
+valid ((Bucket s ((Conj p q):g)) :=> d) = valid (push p (push q (Bucket s g)) :=> d)
+-- done
+valid ((Bucket s []) :=> (Bucket t [])) = not $ S.null $ S.intersection s t
 
 
+-- TODO refactor with buckets
 proof :: Sequent -> Maybe Proof
-proof (g :=> ((Neg p):d)) = do
-  pr <- proof ((p:g) :=> d)
-  return $ NegR (g :=> (Neg p:d)) pr
-proof (((Neg p):g) :=> d) = do
-  pr <- proof (g :=> (p:d))
-  return $ NegL ((Neg p:g) :=> d) pr
-proof (g :=> ((Impl p q):d)) = do
-  pr <- proof ((p:g) :=> (q:d))
-  return $ ImplR (g :=> (Impl p q:d)) pr
-proof (((Impl p q):g) :=> d) = do
-  pr1 <- proof (g :=> (p:d))
-  pr2 <- proof ((q:g) :=> d)
-  return $ ImplL ((Impl p q:g) :=> d) pr1 pr2
-proof (g :=> ((Disj p q):d)) = do
-  pr <- proof (g :=> (p:(q:d)))
-  return $ DisjR (g :=> (Disj p q:d)) pr
-proof (((Disj p q):g) :=> d) = do
-  pr1 <- proof ((p:g) :=> d)
-  pr2 <- proof ((q:g) :=> d)
-  return $ DisjL ((Disj p q:g) :=> d) pr1 pr2
-proof (g :=> (Conj p q:d)) = do
-  pr1 <- proof (g :=> (p:d))
-  pr2 <- proof (g :=> (q:d))
-  return $ ConjR (g :=> (Conj p q:d)) pr1 pr2
-proof (((Conj p q):g) :=> d) = do
-  pr <- proof ((p:(q:g)) :=> d)
-  return $ ConjL ((Conj p q:g) :=> d) pr
-proof (g :=> []) = Nothing
-proof ([] :=> (q:d)) = if all isAtom d then Nothing else proof ([] :=> (d<>[q]))
-proof ((p:g) :=> (q:d)) | all isAtom g && all isAtom d
-                            = if null $ intersect (p:g) (q:d)
-                              then Nothing
-                              else return $ Axiom ((p:g) :=> (q:d))
-                        | all isAtom g = proof ((p:g) :=> (d<>[q]))
-                        | otherwise = proof ((g<>[p]) :=> (q:d))
+proof ((Bucket s ((Atom p):g)) :=> d) = proof (Bucket (S.insert (Atom p) s) g :=> d)
+proof (g :=> (Bucket s ((Atom p):d))) = proof (g :=> Bucket (S.insert (Atom p) s) d)
+proof e@(g :=> (Bucket s ((Neg p):d))) = do
+  pr <- proof (push p g :=> Bucket s d)
+  return $ NegR e pr
+proof e@((Bucket s ((Neg p):g)) :=> d) = do
+  pr <- proof (Bucket s g :=> push p d)
+  return $ NegL e pr
+proof e@(g :=> (Bucket s ((Impl p q):d))) = do
+  pr <- proof (push p g :=> push q (Bucket s d))
+  return $ ImplR e pr
+proof e@((Bucket s ((Impl p q):g)) :=> d) = do
+  pr1 <- proof (Bucket s g :=> push p d)
+  pr2 <- proof (push q (Bucket s g) :=> d)
+  return $ ImplL e pr1 pr2
+proof e@(g :=> (Bucket s ((Disj p q):d))) = do
+  pr <- proof (g :=> push p (push q (Bucket s d)))
+  return $ DisjR e pr
+proof e@((Bucket s ((Disj p q):g)) :=> d) = do
+  pr1 <- proof (push p (Bucket s g) :=> d)
+  pr2 <- proof (push q (Bucket s g) :=> d)
+  return $ DisjL e pr1 pr2
+proof e@(g :=> (Bucket s (Conj p q:d))) = do
+  pr1 <- proof (g :=> push p (Bucket s d))
+  pr2 <- proof (g :=> push q (Bucket s d))
+  return $ ConjR e pr1 pr2
+proof e@((Bucket s ((Conj p q):g)) :=> d) = do
+  pr <- proof (push p (push q (Bucket s g)) :=> d)
+  return $ ConjL e pr
+proof e@((Bucket s []) :=> (Bucket t [])) = if S.null $ S.intersection s t
+                                          then Nothing
+                                          else return $ Axiom e
 
 example :: Sequent
-example = [] :=> [Impl (Impl (Conj (Atom 'p') (Atom 'q')) (Atom 'r'))
-                       (Impl (Atom 'p') (Impl (Atom 'q') (Atom 'r')))]
+example = Bucket S.empty [] :=> Bucket S.empty [Impl (Impl (Conj (Atom 'p') (Atom 'q')) (Atom 'r'))
+                                               (Impl (Atom 'p') (Impl (Atom 'q') (Atom 'r')))]
