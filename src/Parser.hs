@@ -1,50 +1,28 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Parser (parseExpr) where
 
 import Prop
 
 import Text.ParserCombinators.Parsec
+import Text.Parsec.Char
+import Text.Parsec.Expr
 
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse expr "ParseError:"
 
+term :: Parser Expr
+term = (char '(' >> expr >>= \e -> char ')' >> return e)
+   <|> (Atom <$> lower) <?> "simple expression"
+
 expr :: Parser Expr
-expr = choice [ neg, try conj, try disj, try impl, atom ]
+expr = buildExpressionParser table term <?> "expression"
 
-atom :: Parser Expr
-atom = Atom <$> alphaNum
+table = [ [prefix "¬" Neg, prefix "~" Neg ]
+        , [binary "&" Conj AssocLeft, binary "∧" Conj AssocLeft ]
+        , [binary "|" Disj AssocLeft, binary "∨" Disj AssocLeft ]
+        , [binary "->" Impl AssocRight, binary ">" Impl AssocRight, binary "→" Impl AssocRight ]
+        ]
 
-neg :: Parser Expr
-neg = (char '¬' <|> char '~') >> Neg <$> expr
-
-conj :: Parser Expr
-conj = do
-  char '('
-  e1 <- expr
-  spaces
-  char '&' <|> char '∧'
-  spaces
-  e2 <- expr
-  char ')'
-  return $ Conj e1 e2
-
-disj :: Parser Expr
-disj = do
-  char '('
-  e1 <- expr
-  spaces
-  char '|' <|> char '∨'
-  spaces
-  e2 <- expr
-  char ')'
-  return $ Disj e1 e2
-
-impl :: Parser Expr
-impl = do
-  char '('
-  e1 <- expr
-  spaces
-  char '>' <|> char '→'
-  spaces
-  e2 <- expr
-  char ')'
-  return $ Impl e1 e2
+binary name fun = Infix $ string name >> return fun
+prefix name fun = Prefix $ spaces >> string name >> spaces >> return fun
