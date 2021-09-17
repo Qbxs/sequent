@@ -8,6 +8,12 @@ import Data.List (intercalate, intersect)
 import qualified Data.Set as S
 import Text.PrettyPrint.Boxes hiding (render, (<>))
 import qualified Text.PrettyPrint.Boxes as Pretty
+import Control.Monad.Trans.Writer.CPS
+
+instance Semigroup Bool where
+  (<>) = (&&)
+instance Monoid Bool where
+  mempty = True
 
 -- used to separate atomic and non atomic Expressions
 data Bucket a = Bucket (S.Set a) [a]
@@ -35,6 +41,7 @@ data Proof
   | NegL Sequent Proof
   | NegR Sequent Proof
   | Axiom Sequent
+  | Assumption Sequent
  deriving (Show, Eq)
 
 -- helpers
@@ -53,11 +60,12 @@ pretty (ImplR s pr) = rule "→r" (pretty pr) (renderS s)
 pretty (NegL s pr) = rule "¬l" (pretty pr) (renderS s)
 pretty (NegR s pr) = rule "¬r" (pretty pr) (renderS s)
 pretty (Axiom s) = rule "" (text "axiom") (renderS s)
+pretty (Assumption s) = rule "INVALID" (text "") (renderS s)
 
 instance Render Proof where
   render = Pretty.render . pretty
 
-tauto :: Expr -> Maybe Proof
+tauto :: Expr -> Writer Bool Proof
 tauto p = proof (Bucket S.empty [] :=> Bucket S.empty [p])
 
 valid :: Sequent -> Bool
@@ -88,7 +96,7 @@ valid ((Bucket s []) :=> (Bucket t [])) = not $ S.null $ S.intersection s t
 
 
 -- TODO refactor with buckets
-proof :: Sequent -> Maybe Proof
+proof :: Sequent -> Writer Bool Proof
 proof ((Bucket s ((Atom p):g)) :=> d) = proof (Bucket (S.insert (Atom p) s) g :=> d)
 proof (g :=> (Bucket s ((Atom p):d))) = proof (g :=> Bucket (S.insert (Atom p) s) d)
 proof e@(g :=> (Bucket s ((Neg p):d))) = do
@@ -119,8 +127,8 @@ proof e@((Bucket s ((Conj p q):g)) :=> d) = do
   pr <- proof (push p (push q (Bucket s g)) :=> d)
   return $ ConjL e pr
 proof e@((Bucket s []) :=> (Bucket t [])) = if S.null $ S.intersection s t
-                                          then Nothing
-                                          else return $ Axiom e
+                                            then tell False >> return (Assumption e)
+                                            else return $ Axiom e
 
 example :: Sequent
 example = Bucket S.empty [] :=> Bucket S.empty [Impl (Impl (Conj (Atom 'p') (Atom 'q')) (Atom 'r'))

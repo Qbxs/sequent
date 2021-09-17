@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eb97e284977f70efaf257827abbd1b550b0e619abb0059702e2bc9add0474ce0
+-- hash: ea8f4e07e5819391958ef8db1c1b6874bb2ccab59ae6a39038dd6fdf7b2cdec8
 
 name:           sequent
 version:        0.1.0.0
@@ -39,9 +39,10 @@ library
     , boxes
     , containers
     , parsec
+    , transformers
   default-language: Haskell2010
 
-executable sequent-exe
+executable sequent
   main-is: Main.hs
   other-modules:
       Paths_sequent
@@ -54,6 +55,7 @@ executable sequent-exe
     , containers
     , parsec
     , sequent
+    , transformers
   default-language: Haskell2010
 
 test-suite sequent-test
@@ -70,4 +72,5 @@ test-suite sequent-test
     , containers
     , parsec
     , sequent
+    , transformers
   default-language: Haskell2010

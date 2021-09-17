@@ -21,6 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- transformers
 - containers
 - boxes
 - parsec
@@ -28,7 +29,7 @@ library:
   source-dirs: src
 
 executables:
-  sequent-exe:
+  sequent:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
