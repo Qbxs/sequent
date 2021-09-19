@@ -1,6 +1,6 @@
 {-# Language TypeOperators #-}
 
-module SequentCalculus where
+module SequentCalculus (tauto, valid, proof, Proof(..)) where
 
 import Prop
 
@@ -46,21 +46,22 @@ data Proof
 
 -- helpers
 rule :: String -> Box -> Box -> Box
-rule str x y = vcat center2 [x, text (replicate (cols x) '—') <+> text str, y]
+rule str x y = vcat center2 [x, text bar <+> text str, y]
+  where bar = replicate (if cols x == 0 then 0 else max 6 (cols x-3)) '—'
 renderS :: Sequent -> Box
 renderS = text . render
 
 pretty :: Proof -> Box
 pretty (ConjL s pr) = rule "∧l" (pretty pr) (renderS s)
-pretty (ConjR s pr1 pr2) = rule "∧r" (hcat bottom [pretty pr1, pretty pr2]) (renderS s)
-pretty (DisjL s pr1 pr2) = rule "∨l" (hcat bottom [pretty pr1, pretty pr2]) (renderS s)
+pretty (ConjR s pr1 pr2) = rule "∧r" (hsep 2 bottom [pretty pr1, pretty pr2]) (renderS s)
+pretty (DisjL s pr1 pr2) = rule "∨l" (hsep 2 bottom [pretty pr1, pretty pr2]) (renderS s)
 pretty (DisjR s pr) = rule "∨r" (pretty pr) (renderS s)
-pretty (ImplL s pr1 pr2) = rule "→l" (hcat bottom [pretty pr1, pretty pr2]) (renderS s)
+pretty (ImplL s pr1 pr2) = rule "→l" (hsep 2 bottom [pretty pr1, pretty pr2]) (renderS s)
 pretty (ImplR s pr) = rule "→r" (pretty pr) (renderS s)
 pretty (NegL s pr) = rule "¬l" (pretty pr) (renderS s)
 pretty (NegR s pr) = rule "¬r" (pretty pr) (renderS s)
 pretty (Axiom s) = rule "" (text "axiom") (renderS s)
-pretty (Assumption s) = rule "INVALID" (text "") (renderS s)
+pretty (Assumption s) = rule "INVALID" nullBox (renderS s)
 
 instance Render Proof where
   render = Pretty.render . pretty
@@ -95,7 +96,6 @@ valid ((Bucket s ((Conj p q):g)) :=> d) = valid (push p (push q (Bucket s g)) :=
 valid ((Bucket s []) :=> (Bucket t [])) = not $ S.null $ S.intersection s t
 
 
--- TODO refactor with buckets
 proof :: Sequent -> Writer Bool Proof
 proof ((Bucket s ((Atom p):g)) :=> d) = proof (Bucket (S.insert (Atom p) s) g :=> d)
 proof (g :=> (Bucket s ((Atom p):d))) = proof (g :=> Bucket (S.insert (Atom p) s) d)
