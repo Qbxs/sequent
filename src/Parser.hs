@@ -20,6 +20,7 @@ expr = buildExpressionParser table term <?> "expression"
 
 table = [ [prefix "¬" Neg, prefix "~" Neg ]
         , [binary "&" Conj AssocLeft, binary "∧" Conj AssocLeft ]
+        , [binary "↓" Peirce AssocLeft, binary ";" Peirce AssocLeft ]
         , [binary "|" Disj AssocLeft, binary "∨" Disj AssocLeft ]
         , [binary "->" Impl AssocRight, binary ">" Impl AssocRight, binary "→" Impl AssocRight ]
         ]
