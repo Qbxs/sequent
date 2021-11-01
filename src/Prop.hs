@@ -20,7 +20,7 @@ instance Show Expr where
   showsPrec pr (Impl p q) = showParen (pr > 0) $ showsPrec 1 p . showChar '→' . shows q
 
 data Literal = Lit Char | Negated Char
- deriving Eq
+ deriving (Show, Eq, Ord)
 
 newtype Clause = Clause { getClauses :: [[Literal]] }
 
@@ -49,6 +49,10 @@ instance Render Expr where
 isAtom :: Expr -> Bool
 isAtom (Atom _) = True
 isAtom _ = False
+
+isPositive :: Literal -> Bool
+isPositive (Lit _) = True
+isPositive _ = False
 
 toChar :: Expr -> Char
 toChar (Atom p) = p
