@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3b4694df2d1014854437c040ee16628f5d252a767f3b93dd8e2108a6f856f47c
+-- hash: 9613cc6d2e4cd56cb34e6ff362486ace604c43f951e08e2db670507df3d15784
 
 name:           sequent
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Interpretation
       Parser
       Prop
       SAT

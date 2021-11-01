@@ -1,6 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Parser (parseExpr, parseClause) where
+module Parser
+       ( parseExpr
+       , parseClause
+       ) where
 
 import Prop
 

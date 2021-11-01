@@ -9,25 +9,22 @@ module SequentCalculus
         ) where
 
 import Prop
+import Interpretation
 
-import Data.List (intercalate, intersect)
+import Data.List (intercalate)
 import qualified Data.Set as S
 import Text.PrettyPrint.Boxes hiding (render, (<>))
 import qualified Text.PrettyPrint.Boxes as Pretty
 import Control.Monad.Trans.Writer.CPS
 
-instance Semigroup Bool where
-  (<>) = (&&)
-instance Monoid Bool where
-  mempty = True
-
--- used to separate atomic and non atomic Expressions
+-- | data structure used to separate atomic and non atomic Expressions
 data Bucket a b = Bucket (S.Set a) [b]
  deriving (Show, Eq)
 
 data Sequent = (:=>) (Bucket Char Expr) (Bucket Char Expr)
  deriving (Show, Eq)
 
+-- | insert some expression in the correct "bucket"
 push :: Expr -> Bucket Char Expr -> Bucket Char Expr
 push (Atom p) (Bucket s l) = Bucket (S.insert p s) l
 push p (Bucket s l) = Bucket s (p:l)
@@ -49,21 +46,6 @@ data Proof
   | Axiom Sequent
   | Assumption Sequent
  deriving (Show, Eq)
-
--- falsifying Interpretation to extract
-data Interpretation
-  = Interpretation
-     { false :: S.Set Char
-     , true :: S.Set Char
-     }
-
-instance Semigroup Interpretation where
-  (<>) l r = Interpretation (false l `S.union` false r) (true l `S.union` true r)
-instance Monoid Interpretation where
-  mempty = Interpretation S.empty S.empty
-instance Render Interpretation where
-  render i = intercalate ", " $! map (\x -> "I(" <> pure x <> ")=t") (S.toList $ true i)
-                              <> map (\x -> "I(" <> pure x <> ")=f") (S.toList $ false i)
 
 -- helpers
 rule :: String -> Box -> Box -> Box
@@ -87,12 +69,15 @@ pretty (Assumption s) = rule "INVALID" nullBox (renderS s)
 instance Render Proof where
   render = Pretty.render . pretty
 
+-- | check whether a formula is a tautology/valid
 tauto :: Expr -> Writer Interpretation Proof
 tauto p = proof (Bucket S.empty [] :=> Bucket S.empty [p])
 
+-- | check if a formula is a contradiction/falsifiable
 contra :: Expr -> Writer Interpretation Proof
 contra p = proof (Bucket S.empty [p] :=> Bucket S.empty [])
 
+-- | check validity of a sequent
 valid :: Sequent -> Bool
 -- remove atoms
 valid ((Bucket s ((Atom p):g)) :=> d) = valid (Bucket (S.insert p s) g :=> d)
@@ -122,6 +107,7 @@ valid ((Bucket s []) :=> (Bucket t [])) = not $ S.null $ S.intersection s t
 -- | Build a proof tree in LK and memorize (write) falsifying interpretations
 --   as of right now explores the whole tree rather than stopping on an unsatisfiable leaf
 --   alpha rules will match first, however only if they appear first on one side
+--   algorithm same as above
 proof :: Sequent -> Writer Interpretation Proof
 proof ((Bucket s ((Atom p):g)) :=> d) = proof (Bucket (S.insert p s) g :=> d)
 proof (g :=> (Bucket s ((Atom p):d))) = proof (g :=> Bucket (S.insert p s) d)

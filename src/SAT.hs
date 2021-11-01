@@ -6,9 +6,10 @@ module SAT
         ) where
 
 import Prop
+import Interpretation
 
 import Data.Maybe (isJust)
-import Data.List (intercalate, intersect)
+import Data.List (intercalate)
 import qualified Data.Set as S
 
 -- returns a satisfying interpretation for a formula in clause form if it is satisfiable
@@ -26,21 +27,6 @@ instance Render Sequent where
   render ((:=>) s g) = gamma <> " ⊢ "
        where gamma = intercalate "," $ (render <$> S.toList s) <> (render <$> g)
 
--- falsifying Interpretation to extract
-data Interpretation
-  = Interpretation
-     { false :: S.Set Literal
-     , true :: S.Set Literal
-     }
-
-instance Semigroup Interpretation where
-  (<>) l r = Interpretation (false l `S.union` false r) (true l `S.union` true r)
-instance Monoid Interpretation where
-  mempty = Interpretation S.empty S.empty
-instance Render Interpretation where
-  render i = ('\t':) $! intercalate ", " $!
-                map (\(Lit x) -> "I(" <> pure x <> ")=t") (S.toList $ true i)
-             <> map (\(Negated x) -> "I(" <> pure x <> ")=f") (S.toList $ false i)
 
 unsatisfiable :: Interpretation -> Bool
 unsatisfiable i = null (true i) && null (false i)
@@ -73,10 +59,13 @@ sat ((:=>) s ((Conj p q):g)) = error "conjunction should not occur"
 sat ((:=>) s ((Impl p q):g)) = error "unexpected implication"
 -- done: only literals remain
 sat ((:=>) s []) = let (t,f) = S.partition isPositive s in
-                             if S.empty == S.intersection t f
-                             then return $! Interpretation { true = t
-                                                           , false = f }
-                             else Nothing
+                    if S.empty == S.intersection t f
+                    then return $! Interpretation { true = S.map fromLiteral t
+                                                  , false = S.map fromLiteral f }
+                    else Nothing
+  where fromLiteral :: Literal -> Char
+        fromLiteral (Lit p) = p
+        fromLiteral (Negated p) = p
 
 -- | substitute and simplify after
 simplification :: Char -> Expr -> Expr -> Expr
