@@ -13,6 +13,8 @@ or for proof search in LK:
 stack run sequent <formula>
 ```
 
+*In case there are any problems while parsing, put the argument between ""*
+
 Alternatively you can install the executable on the path with
 ```zsh
 stack install sequent

@@ -11,8 +11,11 @@ import Data.Maybe (isJust)
 import Data.List (intercalate, intersect)
 import qualified Data.Set as S
 
+-- returns a satisfying interpretation for a formula in clause form if it is satisfiable
 satisfiable :: Clause -> Maybe Interpretation
-satisfiable = sat . (:=>) S.empty . map (fold Disj Falsum . (toExpr <$>)) . getClauses --unitPropagation
+satisfiable = sat . (:=>) S.empty . map (fold Disj Falsum . (toExpr <$>)) . getClauses
+--             |          |                      |                            |
+--          solve  transform to Sequent  transform clauses to disjunctions  destruct clause form
 
 -- | we use single sided sequents here
 -- | separate literal and non-literal expressions
@@ -21,7 +24,7 @@ data Sequent = (:=>) (S.Set Literal) [Expr]
 
 instance Render Sequent where
   render ((:=>) s g) = gamma <> " ⊢ "
-                  where gamma = intercalate "," $ (render <$> S.toList s) <> (render <$> g)
+       where gamma = intercalate "," $ (render <$> S.toList s) <> (render <$> g)
 
 -- falsifying Interpretation to extract
 data Interpretation
@@ -35,8 +38,9 @@ instance Semigroup Interpretation where
 instance Monoid Interpretation where
   mempty = Interpretation S.empty S.empty
 instance Render Interpretation where
-  render i = intercalate ", " $! map (\(Lit x) -> "I(" <> pure x <> ")=t") (S.toList $ true i)
-                              <> map (\(Negated x) -> "I(" <> pure x <> ")=f") (S.toList $ false i)
+  render i = ('\t':) $! intercalate ", " $!
+                map (\(Lit x) -> "I(" <> pure x <> ")=t") (S.toList $ true i)
+             <> map (\(Negated x) -> "I(" <> pure x <> ")=f") (S.toList $ false i)
 
 unsatisfiable :: Interpretation -> Bool
 unsatisfiable i = null (true i) && null (false i)
@@ -48,8 +52,8 @@ unsatisfiable i = null (true i) && null (false i)
 -- conjunction do not occur
 sat :: Sequent -> Maybe Interpretation
 -- constants (from simplification)
-sat ((:=>) s (Falsum:g)) = Nothing
-sat ((:=>) s (Verum:g)) = sat ((:=>) s g)
+sat ((:=>) s (Falsum:g)) = Nothing -- contradiction
+sat ((:=>) s (Verum:g)) = sat ((:=>) s g) -- simplification
 -- remove literals
 sat ((:=>) s ((Atom p):g)) = sat ((:=>) (S.insert (Lit p) s)
                                         (map (simplification p Verum) g))
@@ -58,7 +62,7 @@ sat ((:=>) s ((Neg (Atom p)):g)) = sat ((:=>) (S.insert (Negated p) s)
 -- double negation elim
 sat ((:=>) s ((Neg (Neg p)):g)) = sat ((:=>) s (p:g))
 -- disjunction left: implemented as atomic cut
--- like this the tree is explored as a dfs from left to right
+-- like this the tree is explored in a dfs from left to right
 sat ((:=>) s ((Disj p q):g)) = let
   p' = sat ((:=>) s (p:q:g))
   q' = sat ((:=>) s (Neg p:q:g))
@@ -70,9 +74,8 @@ sat ((:=>) s ((Impl p q):g)) = error "unexpected implication"
 -- done: only literals remain
 sat ((:=>) s []) = let (t,f) = S.partition isPositive s in
                              if S.empty == S.intersection t f
-                             then return $! Interpretation
-                                             { true = t
-                                             , false = f }
+                             then return $! Interpretation { true = t
+                                                           , false = f }
                              else Nothing
 
 -- | substitute and simplify after
@@ -129,11 +132,3 @@ fold :: (a -> a -> a) -> a -> [a] -> a
 fold alg z [] = z
 fold alg _ [x] = x
 fold alg z (x:xs) = x `alg` fold alg z xs
-
--- | for all atomic clauses simplify the clause set
-unitPropagation :: Clause -> [[Expr]]
-unitPropagation (Clause cs) = (((toExpr <$>) <$> atoms) <>) $!
-                              ((simpl . head <$> atoms) <*>) <$> ((toExpr <$>) <$> rest) -- sry for this mess
-  where (atoms,rest) = span ((1 ==) . length) cs
-        simpl (Lit p) = simplification p Verum
-        simpl (Negated p) = simplification p Falsum
