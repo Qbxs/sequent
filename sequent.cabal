@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ea8f4e07e5819391958ef8db1c1b6874bb2ccab59ae6a39038dd6fdf7b2cdec8
+-- hash: 9613cc6d2e4cd56cb34e6ff362486ace604c43f951e08e2db670507df3d15784
 
 name:           sequent
 version:        0.1.0.0
@@ -27,8 +27,10 @@ source-repository head
 
 library
   exposed-modules:
+      Interpretation
       Parser
       Prop
+      SAT
       SequentCalculus
   other-modules:
       Paths_sequent

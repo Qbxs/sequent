@@ -1,35 +1,38 @@
-{-# Language TypeOperators #-}
+{-# LANGUAGE TypeOperators #-}
 
-module SequentCalculus (tauto, valid, proof, Proof(..)) where
+module SequentCalculus
+        ( Proof(..)
+        , tauto
+        , contra
+        , valid
+        , proof
+        ) where
 
 import Prop
+import Interpretation
 
-import Data.List (intercalate, intersect)
+import Data.List (intercalate)
 import qualified Data.Set as S
 import Text.PrettyPrint.Boxes hiding (render, (<>))
 import qualified Text.PrettyPrint.Boxes as Pretty
 import Control.Monad.Trans.Writer.CPS
 
-instance Semigroup Bool where
-  (<>) = (&&)
-instance Monoid Bool where
-  mempty = True
-
--- used to separate atomic and non atomic Expressions
-data Bucket a = Bucket (S.Set a) [a]
+-- | data structure used to separate atomic and non atomic Expressions
+data Bucket a b = Bucket (S.Set a) [b]
  deriving (Show, Eq)
 
-data Sequent = (:=>) (Bucket Expr) (Bucket Expr)
+data Sequent = (:=>) (Bucket Char Expr) (Bucket Char Expr)
  deriving (Show, Eq)
 
-push :: Expr -> Bucket Expr -> Bucket Expr
-push a@(Atom p) (Bucket s l) = Bucket (S.insert a s) l
+-- | insert some expression in the correct "bucket"
+push :: Expr -> Bucket Char Expr -> Bucket Char Expr
+push (Atom p) (Bucket s l) = Bucket (S.insert p s) l
 push p (Bucket s l) = Bucket s (p:l)
 
 instance Render Sequent where
   render ((Bucket s g) :=> (Bucket t d)) = gamma <> " ⊢ " <> delta
-                  where gamma = intercalate "," $ render <$> (g <> S.toList s)
-                        delta = intercalate "," $ render <$> (d <> S.toList t)
+                  where gamma = intercalate "," $ (pure <$> S.toList s) <> (render <$> g)
+                        delta = intercalate "," $ (pure <$> S.toList t) <> (render <$> d)
 
 data Proof
   = ConjL Sequent Proof
@@ -66,13 +69,19 @@ pretty (Assumption s) = rule "INVALID" nullBox (renderS s)
 instance Render Proof where
   render = Pretty.render . pretty
 
-tauto :: Expr -> Writer Bool Proof
+-- | check whether a formula is a tautology/valid
+tauto :: Expr -> Writer Interpretation Proof
 tauto p = proof (Bucket S.empty [] :=> Bucket S.empty [p])
 
+-- | check if a formula is a contradiction/falsifiable
+contra :: Expr -> Writer Interpretation Proof
+contra p = proof (Bucket S.empty [p] :=> Bucket S.empty [])
+
+-- | check validity of a sequent
 valid :: Sequent -> Bool
 -- remove atoms
-valid ((Bucket s ((Atom p):g)) :=> d) = valid (Bucket (S.insert (Atom p) s) g :=> d)
-valid (g :=> (Bucket s ((Atom p):d))) = valid (g :=> Bucket (S.insert (Atom p) s) d)
+valid ((Bucket s ((Atom p):g)) :=> d) = valid (Bucket (S.insert p s) g :=> d)
+valid (g :=> (Bucket s ((Atom p):d))) = valid (g :=> Bucket (S.insert p s) d)
 -- negation right
 valid (g :=> (Bucket s ((Neg p):d))) = valid (push p g :=> Bucket s d)
 -- negation left
@@ -95,10 +104,13 @@ valid ((Bucket s ((Conj p q):g)) :=> d) = valid (push p (push q (Bucket s g)) :=
 -- done
 valid ((Bucket s []) :=> (Bucket t [])) = not $ S.null $ S.intersection s t
 
-
-proof :: Sequent -> Writer Bool Proof
-proof ((Bucket s ((Atom p):g)) :=> d) = proof (Bucket (S.insert (Atom p) s) g :=> d)
-proof (g :=> (Bucket s ((Atom p):d))) = proof (g :=> Bucket (S.insert (Atom p) s) d)
+-- | Build a proof tree in LK and memorize (write) falsifying interpretations
+--   as of right now explores the whole tree rather than stopping on an unsatisfiable leaf
+--   alpha rules will match first, however only if they appear first on one side
+--   algorithm same as above
+proof :: Sequent -> Writer Interpretation Proof
+proof ((Bucket s ((Atom p):g)) :=> d) = proof (Bucket (S.insert p s) g :=> d)
+proof (g :=> (Bucket s ((Atom p):d))) = proof (g :=> Bucket (S.insert p s) d)
 proof e@(g :=> (Bucket s ((Neg p):d))) = do
   pr <- proof (push p g :=> Bucket s d)
   return $ NegR e pr
@@ -126,10 +138,16 @@ proof e@((Bucket s ((Impl p q):g)) :=> d) = do
   pr1 <- proof (Bucket s g :=> push p d)
   pr2 <- proof (push q (Bucket s g) :=> d)
   return $ ImplL e pr1 pr2
+proof (Bucket s (Verum:g) :=> d) = proof (Bucket s g :=> d)
+proof e@(g :=> Bucket s (Verum:d)) = return (Axiom e)
+proof e@(Bucket s (Falsum:g) :=> d) = return (Assumption e)
+proof (g :=> Bucket s (Falsum:d)) = proof (g :=> Bucket s d)
 proof e@((Bucket s []) :=> (Bucket t [])) = if S.null $ S.intersection s t
-                                            then tell False >> return (Assumption e)
+                                            then do
+                                              tell $ Interpretation {true=s,false=t}
+                                              return (Assumption e)
                                             else return $ Axiom e
 
 example :: Sequent
 example = Bucket S.empty [] :=> Bucket S.empty [Impl (Impl (Conj (Atom 'p') (Atom 'q')) (Atom 'r'))
-                                               (Impl (Atom 'p') (Impl (Atom 'q') (Atom 'r')))]
+                                                     (Impl (Atom 'p') (Impl (Atom 'q') (Atom 'r')))]
