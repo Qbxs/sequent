@@ -2,21 +2,43 @@
 
 Automatic proof search in the style of Gentzen's sequent calculus LK for propostional logic.
 
+For example
+~~~console
+sequent "(p&q->r)->p->q->r" 
+~~~
+
+yields the following derivation in LK:
+~~~
+  axiom      axiom             
+ ——————     ——————             
+p,q ⊢ p,r  p,q ⊢ q,r    axiom  
+————————————————— ∧r   ——————  
+     p,q ⊢ p∧q,r      p,q,r ⊢ r
+———————————————————————————— →l
+         p∧q→r,p,q ⊢ r         
+———————————————————————————— →r
+         p∧q→r,p ⊢ q→r         
+———————————————————————————— →r
+         p∧q→r ⊢ p→q→r         
+———————————————————————————— →r
+        ⊢ (p∧q→r)→p→q→r   
+~~~
+
 Also implements a sat solver for a formula in clause form very loosely based on LK.
 
 Usage with `stack` installed:
-```zsh
+```console
 stack run sequent <clauses>
 ```
 or for proof search in LK:
-```zsh
+```console
 stack run sequent <formula>
 ```
 
 *In case there are any problems while parsing, put the argument between ""*
 
 Alternatively you can install the executable on the path with
-```zsh
+```console
 stack install sequent
 ```
 
