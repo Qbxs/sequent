@@ -19,7 +19,7 @@ satisfiable = sat . (:=>) S.empty . map (fold Disj Falsum . (toExpr <$>)) . getC
 --          solve  transform to Sequent  transform clauses to disjunctions  destruct clause form
 
 -- | we use single sided sequents here
--- | separate literal and non-literal expressions
+--   separate literal and non-literal expressions
 data Sequent = (:=>) (S.Set Literal) [Expr]
  deriving (Show, Eq)
 
@@ -31,7 +31,7 @@ instance Render Sequent where
 unsatisfiable :: Interpretation -> Bool
 unsatisfiable i = null (true i) && null (false i)
 
--- LK rules with a few assumptions:
+-- | LK rules with a few assumptions:
 -- disjunctions contain either only literals or a literal and another disjunction
 -- negations only contain atoms
 -- implications do not occur

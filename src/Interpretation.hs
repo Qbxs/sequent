@@ -5,7 +5,7 @@ import Prop
 import Data.List (intercalate)
 import qualified Data.Set as S
 
--- Interpretation to extract
+-- | Interpretation to extract
 data Interpretation
   = Interpretation
      { false :: S.Set Char

@@ -5,7 +5,7 @@ import Data.List ((!!))
 import System.CPUTime
 
 -- | Benchmarks for up to 15 variables (2^15 clauses)
--- | up to ~12 is feasible, more clauses lead to runtime of several seconds
+-- up to ~12 is feasible, more clauses lead to runtime of several seconds
 main :: IO ()
 main = mapM_ go [1..15]
   where go n = do
